@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="買い物リスト">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>買い物リスト</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+      background: #000000;
+      color: #FFFFFF;
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top, 20px) 0 env(safe-area-inset-bottom, 0);
+    }
+
+    .container { max-width: 500px; margin: 0 auto; padding: 20px 16px 100px; }
+
+    h1 {
+      font-size: 34px;
+      font-weight: 700;
+      padding: 12px 0 16px;
+    }
+
+    .count {
+      font-size: 15px;
+      color: #8E8E93;
+      font-weight: 400;
+      margin-left: 4px;
+    }
+
+    .combo-bar {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .combo-bar input {
+      width: 100%;
+      padding: 10px 76px 10px 36px;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      background: #1C1C1E;
+      color: #FFFFFF;
+      outline: none;
+    }
+    .combo-bar input::placeholder { color: #8E8E93; }
+    .combo-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8E8E93;
+      font-size: 14px;
+      pointer-events: none;
+    }
+    .combo-clear {
+      position: absolute;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #8E8E93;
+      color: #FFF;
+      border: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .combo-clear.show { display: flex; }
+    .combo-add {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #007AFF;
+      color: #FFF;
+      border: none;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .combo-add.show { display: flex; }
+
+    .list { background: #1C1C1E; border-radius: 12px; overflow: hidden; }
+
+    /* Item wrapper for swipe-to-delete */
+    .item-wrap {
+      position: relative;
+      overflow: hidden;
+      border-bottom: 0.5px solid #38383A;
+    }
+    .item-wrap:last-child { border-bottom: none; }
+
+    /* Red delete background revealed on swipe */
+    .item-bg-delete {
+      position: absolute;
+      right: 0; top: 0; bottom: 0; left: 0;
+      background: #FF3B30;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 24px;
+      color: #FFF;
+      font-size: 15px;
+      font-weight: 600;
+      gap: 6px;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 16px;
+      transition: opacity 0.25s;
+      background: #1C1C1E;
+      position: relative;
+      z-index: 1;
+      will-change: transform;
+    }
+    .item.done { opacity: 0.4; }
+
+    .circle {
+      width: 24px; height: 24px;
+      border: 2px solid #48484A;
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .item.done .circle {
+      background: #34C759;
+      border-color: #34C759;
+    }
+    .item.done .circle::after {
+      content: '';
+      position: absolute;
+      left: 5px; top: 2px;
+      width: 6px; height: 11px;
+      border: solid #FFF;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    .item-text {
+      flex: 1;
+      font-size: 17px;
+      cursor: pointer;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .item.done .item-text {
+      text-decoration: line-through;
+      color: #8E8E93;
+    }
+
+    .item-edit {
+      flex: 1;
+      font-size: 17px;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: #FFFFFF;
+      min-width: 0;
+      padding: 0;
+      font-family: inherit;
+    }
+
+    .grip {
+      color: #48484A;
+      font-size: 18px;
+      flex-shrink: 0;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      padding: 0 2px;
+      letter-spacing: 2px;
+    }
+
+    .item.dragging {
+      opacity: 0.5;
+      background: #2C2C2E;
+    }
+    .item-wrap.drag-over-top { box-shadow: inset 0 3px 0 #007AFF; }
+    .item-wrap.drag-over-bottom { box-shadow: inset 0 -3px 0 #007AFF; }
+
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      color: #8E8E93;
+      font-size: 17px;
+    }
+
+    .footer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
+      background: rgba(0,0,0,0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0));
+      display: flex;
+      justify-content: space-between;
+      border-top: 0.5px solid #38383A;
+    }
+
+    .footer-btn {
+      background: none;
+      border: none;
+      color: #007AFF;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .footer-btn:active { opacity: 0.5; }
+
+    .trash-badge {
+      background: #FF3B30;
+      color: #FFF;
+      font-size: 11px;
+      font-weight: 700;
+      min-width: 17px;
+      height: 17px;
+      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      margin-left: 3px;
+      vertical-align: middle;
+    }
+
+    .toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: rgba(60,60,67,0.9);
+      color: #FFF;
+      padding: 14px 24px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 500;
+      text-align: center;
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Trash Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s;
+    }
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal {
+      background: #1C1C1E;
+      width: 100%;
+      max-height: 72dvh;
+      border-radius: 20px 20px 0 0;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .modal-overlay.show .modal { transform: translateY(0); }
+
+    .modal-handle {
+      width: 36px; height: 5px;
+      background: #48484A;
+      border-radius: 3px;
+      margin: 10px auto 0;
+      flex-shrink: 0;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px 14px;
+      border-bottom: 0.5px solid #38383A;
+      flex-shrink: 0;
+    }
+    .modal-header h2 { font-size: 20px; font-weight: 600; }
+    .modal-close {
+      background: #3A3A3C;
+      color: #EBEBF5;
+      border: none;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-body { overflow-y: auto; flex: 1; }
+
+    .trash-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 20px;
+      border-bottom: 0.5px solid #38383A;
+    }
+    .trash-item:last-child { border-bottom: none; }
+    .trash-item-name {
+      flex: 1;
+      font-size: 17px;
+      color: #8E8E93;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .restore-btn {
+      background: none;
+      border: none;
+      color: #007AFF;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 4px 8px;
+      flex-shrink: 0;
+    }
+    .perm-del-btn {
+      background: none;
+      border: none;
+      color: #FF3B30;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 4px 8px;
+      flex-shrink: 0;
+    }
+    .modal-footer {
+      padding: 12px 20px 16px;
+      border-top: 0.5px solid #38383A;
+      flex-shrink: 0;
+    }
+    .empty-trash-btn {
+      width: 100%;
+      background: #FF3B30;
+      color: #FFF;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .empty-trash-btn:active { opacity: 0.8; }
+    .trash-empty-msg {
+      text-align: center;
+      padding: 48px 20px;
+      color: #8E8E93;
+      font-size: 17px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>買い物リスト<span class="count" id="count"></span></h1>
+  <div class="combo-bar">
+    <span class="combo-icon">&#128269;</span>
+    <input type="text" id="comboInput" placeholder="検索 / 追加" enterkeyhint="search">
+    <button class="combo-clear" id="comboClear">×</button>
+    <button class="combo-add" id="comboAdd">+</button>
+  </div>
+  <div class="list" id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Trash Modal -->
+<div class="modal-overlay" id="trashOverlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2>🗑️ ゴミ箱</h2>
+      <button class="modal-close" id="trashClose">✕</button>
+    </div>
+    <div class="modal-body" id="trashList"></div>
+    <div id="trashFooter"></div>
+  </div>
+</div>
+
+<div class="footer-bar">
+  <button class="footer-btn" id="clearBtn">完了を削除</button>
+  <button class="footer-btn" id="trashBtn">🗑️ ゴミ箱<span class="trash-badge" id="trashBadge" style="display:none"></span></button>
+  <button class="footer-btn" id="allClearBtn">すべて削除</button>
+</div>
+
+<script>
+  const KEY = 'shopping-v2';
+  const TRASH_KEY = 'shopping-trash-v1';
+  let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+  let trash = JSON.parse(localStorage.getItem(TRASH_KEY) || '[]');
+
+  const listEl = document.getElementById('list');
+  const countEl = document.getElementById('count');
+  const comboInput = document.getElementById('comboInput');
+  const comboClear = document.getElementById('comboClear');
+  const comboAdd = document.getElementById('comboAdd');
+  let searchQuery = '';
+
+  // ─── Input bar ───────────────────────────────────────────────────────────────
+
+  function updateBarButtons() {
+    const hasText = comboInput.value.trim().length > 0;
+    comboClear.classList.toggle('show', hasText);
+    comboAdd.classList.toggle('show', hasText);
+  }
+
+  comboInput.addEventListener('input', () => {
+    searchQuery = comboInput.value.trim();
+    updateBarButtons();
+    render();
+  });
+
+  function addFromInput() {
+    const name = comboInput.value.trim();
+    if (!name) return;
+    const dup = items.find(i => normalize(i.name) === normalize(name));
+    if (dup) { showToast(`「${dup.name}」はすでにリストにあります`); return; }
+    items.push({ id: Date.now().toString(36), name, done: false });
+    comboInput.value = '';
+    searchQuery = '';
+    updateBarButtons();
+    save();
+    render();
+    comboInput.focus();
+  }
+
+  comboAdd.addEventListener('click', addFromInput);
+  comboClear.addEventListener('click', () => {
+    comboInput.value = '';
+    searchQuery = '';
+    updateBarButtons();
+    render();
+    comboInput.focus();
+  });
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  function kataToHira(str) {
+    return str.replace(/[\u30A1-\u30F6]/g, ch =>
+      String.fromCharCode(ch.charCodeAt(0) - 0x60)
+    );
+  }
+  function normalize(str) { return kataToHira(str.toLowerCase()); }
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function save() { localStorage.setItem(KEY, JSON.stringify(items)); }
+  function saveTrash() { localStorage.setItem(TRASH_KEY, JSON.stringify(trash)); }
+
+  // ─── Trash badge ─────────────────────────────────────────────────────────────
+
+  function updateTrashBadge() {
+    const badge = document.getElementById('trashBadge');
+    if (trash.length > 0) {
+      badge.textContent = trash.length;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // ─── Move to trash ───────────────────────────────────────────────────────────
+
+  function moveToTrash(id) {
+    const idx = items.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    const [item] = items.splice(idx, 1);
+    item.deletedAt = Date.now();
+    trash.unshift(item);
+    save();
+    saveTrash();
+    render();
+    updateTrashBadge();
+    showToast(`「${item.name}」をゴミ箱に移動しました`);
+  }
+
+  // ─── Trash modal ─────────────────────────────────────────────────────────────
+
+  function openTrash() {
+    renderTrash();
+    document.getElementById('trashOverlay').classList.add('show');
+  }
+  function closeTrash() {
+    document.getElementById('trashOverlay').classList.remove('show');
+  }
+
+  document.getElementById('trashBtn').addEventListener('click', openTrash);
+  document.getElementById('trashClose').addEventListener('click', closeTrash);
+  document.getElementById('trashOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('trashOverlay')) closeTrash();
+  });
+
+  function renderTrash() {
+    const listDiv = document.getElementById('trashList');
+    const footer = document.getElementById('trashFooter');
+    if (trash.length === 0) {
+      listDiv.innerHTML = '<div class="trash-empty-msg">ゴミ箱は空です</div>';
+      footer.innerHTML = '';
+      return;
+    }
+    let html = '';
+    trash.forEach(item => {
+      html += `<div class="trash-item">
+        <div class="trash-item-name">${esc(item.name)}</div>
+        <button class="restore-btn" onclick="restore('${item.id}')">元に戻す</button>
+        <button class="perm-del-btn" onclick="deletePermanently('${item.id}')">削除</button>
+      </div>`;
+    });
+    listDiv.innerHTML = html;
+    footer.innerHTML = `<div class="modal-footer"><button class="empty-trash-btn" onclick="emptyTrash()">ゴミ箱を空にする</button></div>`;
+  }
+
+  function restore(id) {
+    const idx = trash.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    const [item] = trash.splice(idx, 1);
+    delete item.deletedAt;
+    items.push(item);
+    save();
+    saveTrash();
+    renderTrash();
+    render();
+    updateTrashBadge();
+    showToast(`「${item.name}」を復元しました`);
+  }
+
+  function deletePermanently(id) {
+    trash = trash.filter(i => i.id !== id);
+    saveTrash();
+    renderTrash();
+    updateTrashBadge();
+  }
+
+  function emptyTrash() {
+    if (!trash.length) return;
+    if (confirm('ゴミ箱を完全に空にしますか？\nこの操作は取り消せません。')) {
+      trash = [];
+      saveTrash();
+      renderTrash();
+      updateTrashBadge();
+    }
+  }
+
+  // ─── Render list ─────────────────────────────────────────────────────────────
+
+  function render() {
+    const filtered = searchQuery
+      ? items.filter(i => normalize(i.name).includes(normalize(searchQuery)))
+      : items;
+    const undone = filtered.filter(i => !i.done);
+    const done = filtered.filter(i => i.done);
+    const sorted = [...undone, ...done];
+
+    const totalUndone = items.filter(i => !i.done).length;
+    countEl.textContent = totalUndone ? totalUndone + '件' : '';
+
+    let html = '';
+    sorted.forEach(item => {
+      html += `<div class="item-wrap" data-id="${item.id}">
+        <div class="item-bg-delete"><span>🗑️</span> 削除</div>
+        <div class="item ${item.done ? 'done' : ''}">
+          <span class="grip" data-grip>≡</span>
+          <div class="circle" onclick="toggle('${item.id}')"></div>
+          <div class="item-text" onclick="startEdit('${item.id}')">${esc(item.name)}</div>
+        </div>
+      </div>`;
+    });
+
+    if (searchQuery && sorted.length === 0) {
+      html += `<div style="text-align:center;padding:24px;color:#8E8E93;font-size:15px;">該当する項目がありません</div>`;
+    }
+
+    listEl.innerHTML = html;
+  }
+
+  function startEdit(id) {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    const el = document.querySelector(`[data-id="${id}"] .item-text`);
+    if (!el) return;
+    const input = document.createElement('input');
+    input.className = 'item-edit';
+    input.value = item.name;
+    input.enterKeyHint = 'done';
+    el.replaceWith(input);
+    input.focus();
+    input.select();
+    const commit = () => {
+      const val = input.value.trim();
+      if (val) { item.name = val; save(); }
+      render();
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+    input.addEventListener('blur', commit);
+  }
+
+  function toggle(id) {
+    const item = items.find(i => i.id === id);
+    if (item) { item.done = !item.done; save(); render(); }
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ─── Footer buttons ──────────────────────────────────────────────────────────
+
+  document.getElementById('clearBtn').onclick = () => {
+    const doneItems = items.filter(i => i.done);
+    if (!doneItems.length) return;
+    const now = Date.now();
+    doneItems.forEach(item => { item.deletedAt = now; trash.unshift(item); });
+    items = items.filter(i => !i.done);
+    save(); saveTrash(); render(); updateTrashBadge();
+    showToast(`${doneItems.length}件をゴミ箱に移動しました`);
+  };
+
+  document.getElementById('allClearBtn').onclick = () => {
+    if (!items.length) return;
+    if (confirm('すべてゴミ箱に移動しますか？')) {
+      const now = Date.now();
+      items.forEach(item => { item.deletedAt = now; trash.unshift(item); });
+      items = [];
+      save(); saveTrash(); render(); updateTrashBadge();
+    }
+  };
+
+  // ─── Drag & drop reorder ─────────────────────────────────────────────────────
+
+  let dragId = null;
+  let dragEl = null;
+  let isDragging = false;
+
+  function getItemEls() { return [...listEl.querySelectorAll('.item-wrap[data-id]')]; }
+
+  function clearDropIndicators() {
+    getItemEls().forEach(el => el.classList.remove('drag-over-top', 'drag-over-bottom'));
+    listEl.querySelectorAll('.item.dragging').forEach(el => el.classList.remove('dragging'));
+  }
+
+  function getDropTarget(y) {
+    for (const el of getItemEls()) {
+      const rect = el.getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom) {
+        const mid = rect.top + rect.height / 2;
+        return { id: el.dataset.id, pos: y < mid ? 'top' : 'bottom', el };
+      }
+    }
+    return null;
+  }
+
+  function reorder(fromId, toId, pos) {
+    if (fromId === toId) return;
+    const fromIdx = items.findIndex(i => i.id === fromId);
+    const [moved] = items.splice(fromIdx, 1);
+    let toIdx = items.findIndex(i => i.id === toId);
+    if (pos === 'bottom') toIdx++;
+    items.splice(toIdx, 0, moved);
+    save(); render();
+  }
+
+  // Touch drag (grip only)
+  listEl.addEventListener('touchstart', e => {
+    const grip = e.target.closest('[data-grip]');
+    if (!grip) return;
+    const wrap = grip.closest('.item-wrap');
+    if (!wrap) return;
+    e.preventDefault();
+    dragId = wrap.dataset.id;
+    dragEl = wrap;
+    isDragging = true;
+    wrap.querySelector('.item').classList.add('dragging');
+  }, { passive: false });
+
+  listEl.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    clearDropIndicators();
+    if (dragEl) dragEl.querySelector('.item').classList.add('dragging');
+    const target = getDropTarget(touch.clientY);
+    if (target && target.id !== dragId) {
+      target.el.classList.add(target.pos === 'top' ? 'drag-over-top' : 'drag-over-bottom');
+    }
+  }, { passive: false });
+
+  listEl.addEventListener('touchend', e => {
+    if (!isDragging) return;
+    const touch = e.changedTouches[0];
+    const target = getDropTarget(touch.clientY);
+    clearDropIndicators();
+    if (target && target.id !== dragId) reorder(dragId, target.id, target.pos);
+    isDragging = false; dragId = null; dragEl = null;
+  });
+
+  // Mouse drag
+  listEl.addEventListener('mousedown', e => {
+    const grip = e.target.closest('[data-grip]');
+    if (!grip) return;
+    const wrap = grip.closest('.item-wrap');
+    if (!wrap) return;
+    e.preventDefault();
+    dragId = wrap.dataset.id;
+    dragEl = wrap;
+    wrap.querySelector('.item').classList.add('dragging');
+
+    const onMove = ev => {
+      clearDropIndicators();
+      if (dragEl) dragEl.querySelector('.item').classList.add('dragging');
+      const target = getDropTarget(ev.clientY);
+      if (target && target.id !== dragId) {
+        target.el.classList.add(target.pos === 'top' ? 'drag-over-top' : 'drag-over-bottom');
+      }
+    };
+    const onUp = ev => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      const target = getDropTarget(ev.clientY);
+      clearDropIndicators();
+      if (target && target.id !== dragId) reorder(dragId, target.id, target.pos);
+      dragId = null; dragEl = null;
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // ─── Swipe-to-delete ─────────────────────────────────────────────────────────
+
+  let swipeState = null;
+
+  listEl.addEventListener('touchstart', e => {
+    if (e.target.closest('[data-grip]')) return; // let drag handler take over
+    const wrap = e.target.closest('.item-wrap');
+    if (!wrap) return;
+    const touch = e.touches[0];
+    swipeState = {
+      id: wrap.dataset.id,
+      inner: wrap.querySelector('.item'),
+      startX: touch.clientX,
+      startY: touch.clientY,
+      decided: null,
+      currentX: 0
+    };
+  }, { passive: true });
+
+  listEl.addEventListener('touchmove', e => {
+    if (!swipeState) return;
+    if (isDragging) { swipeState = null; return; }
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - swipeState.startX;
+    const dy = touch.clientY - swipeState.startY;
+
+    if (!swipeState.decided) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        // Only trigger swipe for leftward horizontal movement
+        swipeState.decided = (Math.abs(dx) > Math.abs(dy) && dx < 0) ? 'swipe' : 'scroll';
+        if (swipeState.decided === 'scroll') { swipeState = null; return; }
+      }
+      return;
+    }
+
+    if (swipeState.decided === 'swipe') {
+      e.preventDefault();
+      const x = Math.min(0, dx);
+      swipeState.currentX = x;
+      swipeState.inner.style.transition = 'none';
+      swipeState.inner.style.transform = `translateX(${x}px)`;
+    }
+  }, { passive: false });
+
+  listEl.addEventListener('touchend', () => {
+    if (!swipeState || swipeState.decided !== 'swipe') { swipeState = null; return; }
+
+    const threshold = -80;
+    if (swipeState.currentX < threshold) {
+      // Animate slide out, then move to trash
+      swipeState.inner.style.transition = 'transform 0.2s ease';
+      swipeState.inner.style.transform = 'translateX(-100%)';
+      const id = swipeState.id;
+      setTimeout(() => moveToTrash(id), 180);
+    } else {
+      // Snap back
+      swipeState.inner.style.transition = 'transform 0.3s ease';
+      swipeState.inner.style.transform = 'translateX(0)';
+    }
+    swipeState = null;
+  });
+
+  // ─── Init ────────────────────────────────────────────────────────────────────
+
+  render();
+  updateTrashBadge();
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+
+</body>
+</html>
