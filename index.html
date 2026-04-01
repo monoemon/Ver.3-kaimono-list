@@ -455,7 +455,7 @@
     if (!name) return;
     const dup = items.find(i => normalize(i.name) === normalize(name));
     if (dup) { showToast(`「${dup.name}」はすでにリストにあります`); return; }
-    items.push({ id: Date.now().toString(36), name, done: false });
+    items.unshift({ id: Date.now().toString(36), name, done: false });
     comboInput.value = '';
     searchQuery = '';
     updateBarButtons();
